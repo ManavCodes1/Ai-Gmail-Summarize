@@ -10,8 +10,8 @@ load_dotenv()
 EMAIL = os.getenv("EMAIL_ADDRESS")
 PASSWORD = os.getenv("EMAIL_PASSWORD")
 
-# Keywords to detect importance
-KEYWORDS = ["invoice", "meeting", "urgent", "deadline", "payment", "project", "schedule"]
+# Default fallback keywords
+DEFAULT_KEYWORDS = ["invoice", "meeting", "urgent", "deadline", "payment", "project", "schedule"]
 
 def clean_text(text):
     return re.sub(r'\s+', ' ', text.strip())
@@ -27,7 +27,7 @@ def score_email(body, keywords):
         score += body.lower().count(keyword.lower())
     return score
 
-def fetch_emails(n=20):
+def fetch_emails(keywords, n=20):
     imap = imaplib.IMAP4_SSL("imap.gmail.com")
     imap.login(EMAIL, PASSWORD)
     imap.select("inbox")
@@ -65,7 +65,7 @@ def fetch_emails(n=20):
 
                 clean_body = clean_text(body)
                 summary = get_summary(clean_body)
-                score = score_email(clean_body, KEYWORDS)
+                score = score_email(clean_body, keywords)
 
                 emails.append({
                     "from": from_,
@@ -78,13 +78,25 @@ def fetch_emails(n=20):
     return sorted(emails, key=lambda x: x["score"], reverse=True)
 
 if __name__ == "__main__":
-    top_emails = fetch_emails(20)
+    print("\n🔍 Welcome to the Gmail Email AI Reader\n")
+    user_input = input("Enter keywords to search for (comma-separated), or press Enter to use defaults: ").strip()
 
-    print("\n🔍 Top Relevant Emails:\n")
+    if user_input:
+        user_keywords = [kw.strip() for kw in user_input.split(",") if kw.strip()]
+    else:
+        user_keywords = DEFAULT_KEYWORDS
+
+    print(f"\n📌 Searching for emails related to: {', '.join(user_keywords)}\n")
+
+    top_emails = fetch_emails(user_keywords, 20)
+
+    print("💌 Top Relevant Emails:\n")
     for email_data in top_emails[:5]:
-        print(f"From: {email_data['from']}")
-        print(f"Subject: {email_data['subject']}")
-        print(f"Summary: {email_data['summary']}")
-        print(f"Keyword Score: {email_data['score']}")
-        print("-" * 50)
-
+        if email_data["score"] > 0:
+            print(f"From: {email_data['from']}")
+            print(f"Subject: {email_data['subject']}")
+            print(f"Summary: {email_data['summary']}")
+            print(f"Keyword Score: {email_data['score']}")
+            print("-" * 50)
+        else:
+            continue
